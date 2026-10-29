@@ -1,0 +1,63 @@
+name: Release
+
+# Push a tag like v1.0.0 to publish a ready-to-use zip on the GitHub Releases page.
+# "Run workflow" (manual) builds the same zip as a downloadable artifact without publishing a release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      PACKAGE: AirBridge-${{ github.ref_name }}-win-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+
+      - name: Build UxPlay
+        shell: msys2 {0}
+        run: bash tools/build-uxplay.sh
+
+      - name: Test
+        run: dotnet test AirBridge.sln -c Release
+
+      - name: Publish AirBridge (self-contained, no .NET install needed)
+        run: >
+          dotnet publish src/AirBridge.App -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none
+          -o dist/AirBridge
+
+      - name: Bundle UxPlay, DLLs and GStreamer plugins
+        shell: msys2 {0}
+        run: bash tools/bundle-uxplay.sh dist/AirBridge
+
+      - name: Zip
+        run: |
+          Copy-Item README.md dist/AirBridge/
+          if (Test-Path LICENSE) { Copy-Item LICENSE dist/AirBridge/ }
+          Compress-Archive -Path dist/AirBridge/* -DestinationPath "dist/$env:PACKAGE.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE }}
+          path: dist/${{ env.PACKAGE }}.zip
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: dist/${{ env.PACKAGE }}.zip
+          generate_release_notes: true

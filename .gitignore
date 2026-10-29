@@ -1,0 +1,17 @@
+# Build output
+bin/
+obj/
+publish/
+dist/
+*.user
+*.suo
+
+# IDEs
+.vs/
+.idea/
+*.DotSettings.user
+
+# Test results
+TestResults/
+*.trx
+coverage*.xml

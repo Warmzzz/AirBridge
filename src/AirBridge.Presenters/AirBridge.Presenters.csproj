@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AirBridge.Application\AirBridge.Application.csproj" />
+    <ProjectReference Include="..\AirBridge.Domain\AirBridge.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
