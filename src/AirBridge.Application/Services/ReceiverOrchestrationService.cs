@@ -19,6 +19,7 @@ public sealed class ReceiverOrchestrationService : IAsyncDisposable
     private readonly IDisposable _statusSubscription;
     private readonly CancellationTokenSource _cts = new();
     private int _attempts;
+    private volatile bool _retryPending;
     private DateTimeOffset _lastAttemptAt = DateTimeOffset.MinValue;
 
     public ReceiverOrchestrationService(
@@ -39,6 +40,12 @@ public sealed class ReceiverOrchestrationService : IAsyncDisposable
     // Only crashes / failed starts are retried; a user stop or restart goes through Stopped and is left alone.
     private void OnStatusChanged(ReceiverStatus status)
     {
+        // A start we didn't trigger (tray Start, settings or device change) gets a fresh retry budget.
+        if (status is ReceiverStatus.Starting && !_retryPending)
+        {
+            _attempts = 0;
+        }
+
         if (status is not ReceiverStatus.Error || _cts.IsCancellationRequested) return;
 
         var now = DateTimeOffset.Now;
@@ -64,8 +71,18 @@ public sealed class ReceiverOrchestrationService : IAsyncDisposable
         try
         {
             await Task.Delay(RetryDelay, _cts.Token).ConfigureAwait(false);
-            // A failure here publishes Error again, which schedules the next attempt.
-            await _restartUseCase.ExecuteAsync(_cts.Token);
+
+            // Marks the Starting status this restart publishes as ours, so it doesn't refill the budget.
+            _retryPending = true;
+            try
+            {
+                // A failure here publishes Error again, which schedules the next attempt.
+                await _restartUseCase.ExecuteAsync(_cts.Token);
+            }
+            finally
+            {
+                _retryPending = false;
+            }
         }
         catch (OperationCanceledException)
         {

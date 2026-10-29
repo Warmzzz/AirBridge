@@ -69,6 +69,7 @@ public sealed class UxPlayReceiver(IProcessManager processManager, ILogger<UxPla
 
         lock (_gate)
         {
+            _openSockets.Clear();
             EndSession();
         }
         _status.OnNext(ReceiverStatus.Stopped);
@@ -83,6 +84,8 @@ public sealed class UxPlayReceiver(IProcessManager processManager, ILogger<UxPla
 
     private void SubscribeToProcessEvents()
     {
+        // After a crash the old subscriptions are still live (only StopAsync clears them); never stack a second set.
+        DisposeSubscriptions();
         _processSubscriptions = new CompositeDisposable(
             processManager.OutputReceived.Merge(processManager.ErrorReceived).Subscribe(OnOutputLine),
             processManager.ProcessExited.Subscribe(OnProcessExited));
@@ -127,7 +130,6 @@ public sealed class UxPlayReceiver(IProcessManager processManager, ILogger<UxPla
 
     private void EndSession()
     {
-        _openSockets.Clear();
         if (_session is null) return;
 
         var session = _session;
@@ -151,6 +153,7 @@ public sealed class UxPlayReceiver(IProcessManager processManager, ILogger<UxPla
 
         lock (_gate)
         {
+            _openSockets.Clear();
             EndSession();
         }
         if (_status.Value is not ReceiverStatus.Stopping and not ReceiverStatus.Stopped)

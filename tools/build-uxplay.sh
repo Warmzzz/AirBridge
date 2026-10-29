@@ -15,7 +15,9 @@ else
   git clone --depth 1 https://github.com/FDH2/UxPlay "$src"
 fi
 
-cmake -S "$src" -B "$src/build" -G Ninja -DCMAKE_BUILD_TYPE=Release
+# NO_MARCH_NATIVE: UxPlay otherwise compiles with -march=native, so a binary built on the CI runner
+# crashes with STATUS_ILLEGAL_INSTRUCTION (0xC000001D) on CPUs lacking the runner's instruction sets.
+cmake -S "$src" -B "$src/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DNO_MARCH_NATIVE=ON
 ninja -C "$src/build"
 cmake --install "$src/build" --prefix /ucrt64
 
